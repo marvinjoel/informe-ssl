@@ -33,6 +33,69 @@ Se descartaron problemas de permisos ejecutando los siguientes comandos en la te
 Se identificó que el bloque `server` (puerto 80) apuntaba a una ruta genérica incorrecta.
 
 **Código Erróneo (Anterior):**
+```
+server {
+    listen 80;
+    listen [::]:80;
+    server_name onix.avantecds.es;
+
+    # --- ESTO ES LO QUE FALLABA ANTES ---
+    # Obligamos a Nginx a mirar en la carpeta que creamos
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+        allow all;
+        default_type "text/plain";
+        try_files $uri =404;
+    }
+    # ------------------------------------
+
+    # Todo lo demás, mándalo al HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name onix.avantecds.es;
+
+    # Certificados (ahora usa los viejos, luego CloudPanel los cambia)
+    ssl_certificate_key /etc/nginx/ssl-certificates/onix.avantecds.es.key;
+    ssl_certificate /etc/nginx/ssl-certificates/onix.avantecds.es.crt;
+
+    access_log /var/log/nginx/onix.avantecds.es.access.log;
+    error_log /var/log/nginx/onix.avantecds.es.error.log;
+
+    ssl_stapling off;
+    ssl_stapling_verify off;
+
+    # Archivos estáticos
+    location ~* ^.+\.(css|js|jpg|jpeg|gif|png|ico|gz|svg|svgz|ttf|otf|woff|woff2|eot|mp4|ogg|ogv|webm|webp|zip|swf|map|mjs)$ {
+        root /home/onixsistema/htdocs/onix.avantecds.es;
+        expires max;
+        access_log off;
+    }
+
+    location ~ /\.(ht|svn|git) {
+        deny all;
+    }
+
+    # Tu aplicación (Proxy)
+    location / {
+        proxy_pass http://localhost:8090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+    }
+}
+```
+
+
 ```nginx
 location ^~ /.well-known/acme-challenge/ {
     root /var/www/letsencrypt;
